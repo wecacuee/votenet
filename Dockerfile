@@ -1,6 +1,6 @@
 FROM pytorch/pytorch:1.1.0-cuda10.0-cudnn7.5-runtime
 
-RUN apt-get update && apt-get install -y apt-transport-https && \
+RUN apt-get update && apt-get install -y apt-transport-https wget && \
     rm -rf /var/lib/apt/lists/*
 
 RUN echo "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list
@@ -20,3 +20,5 @@ RUN mkdir -p $WORKSPACE && \
     cd $WORKSPACE/votenet/pointnet2 && \
     python setup.py install
 
+WORKDIR $WORKSPACE/votenet
+CMD /opt/conda/bin/python $WORKSPACE/votenet/demo.py

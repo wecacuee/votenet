@@ -1,4 +1,4 @@
 sudo
 wget
-cuda-toolkit-10
+cuda-toolkit-10-0
 unzip
