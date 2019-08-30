@@ -1,0 +1,8 @@
+cv2
+matplotlib
+opencv-python
+plyfile
+scipy
+tensorflow_gpu
+trimesh>=2.35.39,<2.35.40
+networkx
