@@ -16,6 +16,7 @@ import time
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='sunrgbd', help='Dataset: sunrgbd or scannet [default: sunrgbd]')
 parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
+parser.add_argument('--pc_path', type=str, help='Input point cloud path')
 FLAGS = parser.parse_args()
 
 import torch
@@ -26,7 +27,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
-from pc_util import random_sampling, read_ply
+from pc_util import random_sampling, read_ply, write_ply
 from ap_helper import parse_predictions
 
 def preprocess_point_cloud(point_cloud):
@@ -39,23 +40,28 @@ def preprocess_point_cloud(point_cloud):
     pc = np.expand_dims(point_cloud.astype(np.float32), 0) # (1,40000,4)
     return pc
 
-if __name__=='__main__':
-    
+
+def point_cloud_to_detections(point_cloud=None, pc_path=None):
+    if point_cloud is not None and pc_path is not None:
+        write_ply(point_cloud, pc_path)
+        FLAGS.pc_path = pc_path
+
     # Set file paths and dataset config
     demo_dir = os.path.join(BASE_DIR, 'demo_files') 
     if FLAGS.dataset == 'sunrgbd':
         sys.path.append(os.path.join(ROOT_DIR, 'sunrgbd'))
         from sunrgbd_detection_dataset import DC # dataset config
         checkpoint_path = os.path.join(demo_dir, 'pretrained_votenet_on_sunrgbd.tar')
-        pc_path = os.path.join(demo_dir, 'input_pc_sunrgbd.ply')
+        pc_path = FLAGS.pc_path or os.path.join(demo_dir, 'input_pc_sunrgbd.ply')
     elif FLAGS.dataset == 'scannet':
         sys.path.append(os.path.join(ROOT_DIR, 'scannet'))
         from scannet_detection_dataset import DC # dataset config
         checkpoint_path = os.path.join(demo_dir, 'pretrained_votenet_on_scannet.tar')
-        pc_path = os.path.join(demo_dir, 'input_pc_scannet.ply')
+        pc_path = FLAGS.pc_path or os.path.join(demo_dir, 'input_pc_scannet.ply')
     else:
         print('Unkown dataset %s. Exiting.'%(DATASET))
         exit(-1)
+
 
     eval_config_dict = {'remove_empty_box': True, 'use_3d_nms': True, 'nms_iou': 0.25,
         'use_old_type_nms': False, 'cls_nms': False, 'per_class_proposal': False,
@@ -98,7 +104,12 @@ if __name__=='__main__':
         for cls in row:
             print('pred_map_cls: ', cls[0], '; conf:', cls[2])
 
-    dump_dir = os.path.join(demo_dir, '%s_results'%(FLAGS.dataset))
+    pc_path_prefix, _ = os.path.splitext(pc_path)
+    dump_dir = "{pc_path_prefix}_results".format(pc_path_prefix=pc_path_prefix)
     if not os.path.exists(dump_dir): os.mkdir(dump_dir) 
     MODEL.dump_results(end_points, dump_dir, DC, True)
     print('Dumped detection results to folder %s'%(dump_dir))
+    return read_ply(os.path.join(dump_dir, "000000_pred_confident_bbox")), pred_map_cls
+
+if __name__== '__main__':
+    point_cloud_to_detections()

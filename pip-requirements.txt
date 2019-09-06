@@ -5,3 +5,6 @@ scipy
 tensorflow_gpu
 trimesh>=2.35.39,<2.35.40
 networkx
+rospkg
+catkin_pkg
+empy

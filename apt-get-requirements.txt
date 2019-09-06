@@ -2,3 +2,5 @@ sudo
 wget
 cuda-toolkit-10-0
 unzip
+python-pip
+python3-pip
