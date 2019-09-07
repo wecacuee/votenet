@@ -33,9 +33,7 @@ RUN pip3 install -r /tmp/pip-requirements.txt
 
 ENV WORKSPACE /home/root/code
 RUN mkdir -p $WORKSPACE
-COPY . $WORKSPACE/votenet
 RUN mkdir -p $WORKSPACE && \
-    pip3 install torch torchvision && \
     git clone https://github.com/wecacuee/votenet.git $WORKSPACE/votenet && \
     cd $WORKSPACE/votenet/pointnet2 && \
     python3 setup.py install
@@ -68,3 +66,8 @@ exec $@ \
 ENTRYPOINT $CATKIN_WS/ros_entrypoint.sh
 CMD $CATKIN_WS/ros_entrypoint.sh rosrun votenet votenet_service.py
 
+
+# nvidia-docker 1.0
+ENV CUDA_VERSION 10.0
+LABEL com.nvidia.volumes.needed="nvidia_driver"
+LABEL com.nvidia.cuda.version="${CUDA_VERSION}"

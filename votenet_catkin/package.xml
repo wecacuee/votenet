@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>votenet</name>
+  <name>votenet_catkin</name>
   <version>0.0.0</version>
   <description>The votenet package</description>
 

@@ -8,3 +8,5 @@ networkx
 rospkg
 catkin_pkg
 empy
+torch
+torchvision

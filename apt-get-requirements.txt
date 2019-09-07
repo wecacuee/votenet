@@ -1,6 +1,7 @@
 sudo
 wget
 cuda-toolkit-10-0
+cuda-drivers
 unzip
 python-pip
 python3-pip

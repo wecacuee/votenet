@@ -13,11 +13,13 @@ import argparse
 import importlib
 import time
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', default='sunrgbd', help='Dataset: sunrgbd or scannet [default: sunrgbd]')
-parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
-parser.add_argument('--pc_path', type=str, help='Input point cloud path')
-FLAGS = parser.parse_args()
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', default='sunrgbd', help='Dataset: sunrgbd or scannet [default: sunrgbd]')
+    parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
+    parser.add_argument('--pc_path', type=str, help='Input point cloud path')
+    FLAGS = parser.parse_args()
+    return vars(FLAGS)
 
 import torch
 import torch.nn as nn
@@ -30,36 +32,38 @@ sys.path.append(os.path.join(ROOT_DIR, 'models'))
 from pc_util import random_sampling, read_ply, write_ply
 from ap_helper import parse_predictions
 
-def preprocess_point_cloud(point_cloud):
+def preprocess_point_cloud(point_cloud, num_point=20000):
     ''' Prepare the numpy point cloud (N,3) for forward pass '''
     point_cloud = point_cloud[:,0:3] # do not use color for now
     floor_height = np.percentile(point_cloud[:,2],0.99)
     height = point_cloud[:,2] - floor_height
     point_cloud = np.concatenate([point_cloud, np.expand_dims(height, 1)],1) # (N,4) or (N,7)
-    point_cloud = random_sampling(point_cloud, FLAGS.num_point)
+    point_cloud = random_sampling(point_cloud, num_point)
     pc = np.expand_dims(point_cloud.astype(np.float32), 0) # (1,40000,4)
     return pc
 
 
-def point_cloud_to_detections(point_cloud=None, pc_path=None):
+def point_cloud_to_detections(point_cloud=None, pc_path=None,
+                              dataset='sunrgbd', num_point=20000):
     if point_cloud is not None and pc_path is not None:
         write_ply(point_cloud, pc_path)
-        FLAGS.pc_path = pc_path
+    if point_cloud is not None and pc_path is None:
+        raise ValueError("Please provide both pc_path and point_cloud. Not just one")
 
     # Set file paths and dataset config
     demo_dir = os.path.join(BASE_DIR, 'demo_files') 
-    if FLAGS.dataset == 'sunrgbd':
+    if dataset == 'sunrgbd':
         sys.path.append(os.path.join(ROOT_DIR, 'sunrgbd'))
         from sunrgbd_detection_dataset import DC # dataset config
         checkpoint_path = os.path.join(demo_dir, 'pretrained_votenet_on_sunrgbd.tar')
-        pc_path = FLAGS.pc_path or os.path.join(demo_dir, 'input_pc_sunrgbd.ply')
-    elif FLAGS.dataset == 'scannet':
+        pc_path = pc_path or os.path.join(demo_dir, 'input_pc_sunrgbd.ply')
+    elif dataset == 'scannet':
         sys.path.append(os.path.join(ROOT_DIR, 'scannet'))
         from scannet_detection_dataset import DC # dataset config
         checkpoint_path = os.path.join(demo_dir, 'pretrained_votenet_on_scannet.tar')
-        pc_path = FLAGS.pc_path or os.path.join(demo_dir, 'input_pc_scannet.ply')
+        pc_path = pc_path or os.path.join(demo_dir, 'input_pc_scannet.ply')
     else:
-        print('Unkown dataset %s. Exiting.'%(DATASET))
+        print('Unkown dataset %s. Exiting.'%(dataset))
         exit(-1)
 
 
@@ -87,8 +91,9 @@ def point_cloud_to_detections(point_cloud=None, pc_path=None):
    
     # Load and preprocess input point cloud 
     net.eval() # set model to eval mode (for bn and dp)
+    print("Loading point cloud from {}".format(pc_path))
     point_cloud = read_ply(pc_path)
-    pc = preprocess_point_cloud(point_cloud)
+    pc = preprocess_point_cloud(point_cloud, num_point=num_point)
     print('Loaded point cloud data: %s'%(pc_path))
    
     # Model inference
@@ -100,6 +105,8 @@ def point_cloud_to_detections(point_cloud=None, pc_path=None):
     end_points['point_clouds'] = inputs['point_clouds']
     pred_map_cls = parse_predictions(end_points, eval_config_dict)
     print('Finished detection. %d object detected.'%(len(pred_map_cls[0])))
+    if not len(pred_map_cls[0]):
+        return
     for row in pred_map_cls:
         for cls in row:
             print('pred_map_cls: ', cls[0], '; conf:', cls[2])
@@ -109,7 +116,7 @@ def point_cloud_to_detections(point_cloud=None, pc_path=None):
     if not os.path.exists(dump_dir): os.mkdir(dump_dir) 
     MODEL.dump_results(end_points, dump_dir, DC, True)
     print('Dumped detection results to folder %s'%(dump_dir))
-    return read_ply(os.path.join(dump_dir, "000000_pred_confident_bbox")), pred_map_cls
+    return read_ply(os.path.join(dump_dir, "000000_pred_confident_bbox.ply")), pred_map_cls
 
 if __name__== '__main__':
-    point_cloud_to_detections()
+    point_cloud_to_detections(**parse_args())
